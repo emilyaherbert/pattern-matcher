@@ -41,6 +41,10 @@ pub enum Expression<'sc> {
     Tuple {
         elems: Vec<Expression<'sc>>,
     },
+    StructExpression {
+        struct_name: Ident<'sc>,
+        fields: Vec<StructExpressionField<'sc>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +96,12 @@ pub enum Literal<'sc> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StructExpressionField<'sc> {
+    pub name: Ident<'sc>,
+    pub value: Expression<'sc>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MatchStatement<'sc> {
     pub primary: Expression<'sc>,
     pub branches: Vec<MatchBranch<'sc>>,
@@ -111,9 +121,24 @@ pub enum MatchScrutinee<'sc> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Scrutinee<'sc> {
-    Literal { value: Literal<'sc> },
-    VariableExpression { name: Ident<'sc> },
-    Tuple { elems: Vec<Scrutinee<'sc>> },
+    Literal {
+        value: Literal<'sc>,
+    },
+    VariableExpression {
+        name: Ident<'sc>,
+    },
+    Tuple {
+        elems: Vec<Scrutinee<'sc>>,
+    },
+    StructScrutinee {
+        struct_name: Ident<'sc>,
+        fields: Vec<StructScrutineeField<'sc>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructScrutineeField<'sc> {
+    pub scrutinee: Scrutinee<'sc>,
 }
 
 pub mod constructors {
@@ -171,6 +196,23 @@ pub mod constructors {
         Expression::Literal { value: lit }
     }
 
+    pub fn struct_<'sc>(
+        name: &'sc str,
+        fields: Vec<StructExpressionField<'sc>>,
+    ) -> Expression<'sc> {
+        Expression::StructExpression {
+            struct_name: Ident { primary_name: name },
+            fields,
+        }
+    }
+
+    pub fn struct_field<'sc>(name: &'sc str, value: Expression<'sc>) -> StructExpressionField<'sc> {
+        StructExpressionField {
+            name: Ident { primary_name: name },
+            value,
+        }
+    }
+
     pub fn tuple<'sc>(elems: Vec<Expression<'sc>>) -> Expression<'sc> {
         Expression::Tuple { elems }
     }
@@ -201,5 +243,19 @@ pub mod constructors {
 
     pub fn tuple_scrutinee<'sc>(elems: Vec<Scrutinee<'sc>>) -> Scrutinee<'sc> {
         Scrutinee::Tuple { elems }
+    }
+
+    pub fn struct_scrutinee<'sc>(
+        name: &'sc str,
+        fields: Vec<StructScrutineeField<'sc>>,
+    ) -> Scrutinee<'sc> {
+        Scrutinee::StructScrutinee {
+            struct_name: Ident { primary_name: name },
+            fields,
+        }
+    }
+
+    pub fn struct_scrutinee_field<'sc>(scrutinee: Scrutinee<'sc>) -> StructScrutineeField<'sc> {
+        StructScrutineeField { scrutinee }
     }
 }
