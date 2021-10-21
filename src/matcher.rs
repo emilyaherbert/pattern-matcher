@@ -252,4 +252,54 @@ mod test {
         let matches = matcher(&exp, &scrutinee, &namespace);
         assert_eq!(matches.unwrap().len(), 2);
     }
+
+    #[test]
+    fn struct_to_struct_variable() {
+        let mut namespace = HashMap::new();
+        namespace.insert(
+            "foo".to_string(),
+            struct_(
+                "Point",
+                vec![
+                    struct_field("x", literal(u32_(5))),
+                    struct_field("y", literal(u32_(7))),
+                ],
+            ),
+        );
+        let exp = variable("foo");
+        let scrutinee = struct_scrutinee(
+            "Point",
+            vec![
+                struct_scrutinee_field(variable_scrutinee("x")),
+                struct_scrutinee_field(literal_scrutinee(u32_(7))),
+            ],
+        );
+        let matches = matcher(&exp, &scrutinee, &namespace);
+        assert_eq!(matches.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn struct_none() {
+        let mut namespace = HashMap::new();
+        namespace.insert(
+            "foo".to_string(),
+            struct_(
+                "Point",
+                vec![
+                    struct_field("x", literal(u32_(5))),
+                    struct_field("y", literal(u32_(7))),
+                ],
+            ),
+        );
+        let exp = variable("foo");
+        let scrutinee = struct_scrutinee(
+            "Point",
+            vec![
+                struct_scrutinee_field(variable_scrutinee("x")),
+                struct_scrutinee_field(literal_scrutinee(u32_(8))),
+            ],
+        );
+        let matches = matcher(&exp, &scrutinee, &namespace);
+        assert_eq!(matches, None);
+    }
 }
