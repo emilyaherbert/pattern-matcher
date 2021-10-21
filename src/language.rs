@@ -1,25 +1,24 @@
-use std::collections::HashMap;
-
 #[derive(Debug)]
 pub struct Tree<'sc> {
     pub nodes: Vec<Node<'sc>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node<'sc> {
     Declaration(Declaration<'sc>),
     Expression(Expression<'sc>),
     WhileLoop(WhileLoop<'sc>),
     ReturnStatement(ReturnStatement<'sc>),
+    MatchStatement(MatchStatement<'sc>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Declaration<'sc> {
     VariableDeclaration(VariableDeclaration<'sc>),
     Reassignment(Reassignment<'sc>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression<'sc> {
     Literal {
         value: Literal<'sc>,
@@ -31,10 +30,6 @@ pub enum Expression<'sc> {
     Array {
         contents: Vec<Expression<'sc>>,
     },
-    MatchExpression {
-        primary_expression: Box<Expression<'sc>>,
-        branches: Vec<MatchBranch<'sc>>,
-    },
     CodeBlock {
         contents: CodeBlock<'sc>,
     },
@@ -43,38 +38,40 @@ pub enum Expression<'sc> {
         then: Box<Expression<'sc>>,
         r#else: Option<Box<Expression<'sc>>>,
     },
+    Tuple {
+        elems: Vec<Expression<'sc>>,
+    },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WhileLoop<'sc> {
     pub condition: Expression<'sc>,
     pub body: CodeBlock<'sc>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReturnStatement<'sc> {
     pub expr: Expression<'sc>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CodeBlock<'sc> {
     pub contents: Vec<Node<'sc>>,
-    pub scope: HashMap<&'sc str, Declaration<'sc>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VariableDeclaration<'sc> {
     pub name: Ident<'sc>,
     pub body: Expression<'sc>,
     pub is_mutable: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ident<'sc> {
     pub primary_name: &'sc str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Reassignment<'sc> {
     // the thing being reassigned
     pub lhs: Box<Expression<'sc>>,
@@ -94,16 +91,29 @@ pub enum Literal<'sc> {
     B256([u8; 32]),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchStatement<'sc> {
+    pub primary: Expression<'sc>,
+    pub branches: Vec<MatchBranch<'sc>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MatchBranch<'sc> {
-    pub condition: MatchCondition<'sc>,
+    pub condition: MatchScrutinee<'sc>,
     pub result: Expression<'sc>,
 }
 
-#[derive(Debug, Clone)]
-pub enum MatchCondition<'sc> {
+#[derive(Debug, Clone, PartialEq)]
+pub enum MatchScrutinee<'sc> {
     CatchAll,
-    Expression(Expression<'sc>),
+    Scrutinee(Scrutinee<'sc>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Scrutinee<'sc> {
+    Literal { value: Literal<'sc> },
+    VariableExpression { name: Ident<'sc> },
+    Tuple { elems: Vec<Scrutinee<'sc>> },
 }
 
 pub mod constructors {
@@ -126,9 +136,7 @@ pub mod constructors {
     }
 
     pub fn return_<'sc>(expr: Expression<'sc>) -> Node<'sc> {
-        Node::ReturnStatement(ReturnStatement {
-            expr
-        })
+        Node::ReturnStatement(ReturnStatement { expr })
     }
 
     pub fn reassignment<'sc>(lhs: Expression<'sc>, rhs: Expression<'sc>) -> Node<'sc> {
@@ -138,21 +146,60 @@ pub mod constructors {
         }))
     }
 
-    pub fn variable_expression<'sc>(name: &'sc str) -> Expression<'sc> {
+    pub fn match_<'sc>(primary: Expression<'sc>, branches: Vec<MatchBranch<'sc>>) -> Node<'sc> {
+        Node::MatchStatement(MatchStatement { primary, branches })
+    }
+
+    pub fn match_branch<'sc>(
+        condition: MatchScrutinee<'sc>,
+        result: Expression<'sc>,
+    ) -> MatchBranch<'sc> {
+        MatchBranch { condition, result }
+    }
+
+    pub fn match_scrutinee<'sc>(scrutinee: Scrutinee<'sc>) -> MatchScrutinee<'sc> {
+        MatchScrutinee::Scrutinee(scrutinee)
+    }
+
+    pub fn variable<'sc>(name: &'sc str) -> Expression<'sc> {
         Expression::VariableExpression {
-            name: Ident {
-                primary_name: name
-            }
+            name: Ident { primary_name: name },
         }
     }
 
     pub fn literal<'sc>(lit: Literal<'sc>) -> Expression<'sc> {
-        Expression::Literal {
-            value: lit
-        }
+        Expression::Literal { value: lit }
+    }
+
+    pub fn tuple<'sc>(elems: Vec<Expression<'sc>>) -> Expression<'sc> {
+        Expression::Tuple { elems }
     }
 
     pub fn boolean<'sc>(b: bool) -> Literal<'sc> {
         Literal::Boolean(b)
+    }
+
+    pub fn block<'sc>(nodes: Vec<Node<'sc>>) -> Expression<'sc> {
+        Expression::CodeBlock {
+            contents: CodeBlock { contents: nodes },
+        }
+    }
+
+    pub fn u32_<'sc>(n: u32) -> Literal<'sc> {
+        Literal::U32(n)
+    }
+
+    pub fn literal_scrutinee<'sc>(lit: Literal<'sc>) -> Scrutinee<'sc> {
+        Scrutinee::Literal { value: lit }
+    }
+
+    pub fn variable_scrutinee<'sc>(name: &'sc str) -> Scrutinee<'sc> {
+        Scrutinee::VariableExpression {
+            name: Ident { primary_name: name },
+        }
+    }
+
+    pub fn tuple_scrutinee<'sc>(elems: Vec<Scrutinee<'sc>>) -> Scrutinee<'sc> {
+        Scrutinee::Tuple { elems }
     }
 }
