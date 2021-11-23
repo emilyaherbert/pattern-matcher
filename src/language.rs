@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+pub type Namespace<'sc> = HashMap<String, Expression<'sc>>;
+
 #[derive(Debug)]
 pub struct Tree<'sc> {
     pub nodes: Vec<Node<'sc>>,
@@ -10,6 +14,7 @@ pub enum Node<'sc> {
     WhileLoop(WhileLoop<'sc>),
     ReturnStatement(ReturnStatement<'sc>),
     MatchStatement(MatchStatement<'sc>),
+    IfExpression(IfExpression<'sc>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +110,13 @@ pub struct StructExpressionField<'sc> {
 pub struct MatchStatement<'sc> {
     pub primary: Expression<'sc>,
     pub branches: Vec<MatchBranch<'sc>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IfExpression<'sc> {
+    pub primary: Expression<'sc>,
+    pub left: Expression<'sc>,
+    pub right: Expression<'sc>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

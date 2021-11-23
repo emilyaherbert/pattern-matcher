@@ -1,20 +1,22 @@
 use crate::language::*;
 
-use std::collections::HashMap;
-
-type Namespace<'sc> = HashMap<String, Expression<'sc>>;
-type MatchMap<'sc> = Vec<(String, Expression<'sc>)>;
+// if (x == y)
+pub type MatchReqMap<'sc> = Vec<(Expression<'sc>, Expression<'sc>)>;
+// let z = 4;
+pub type MatchImplMap<'sc> = Vec<(String, Expression<'sc>)>;
 
 pub fn matcher<'sc>(
     exp: &Expression<'sc>,
     scrutinee: &Scrutinee<'sc>,
     namespace: &Namespace<'sc>,
-) -> Option<MatchMap<'sc>> {
+) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
     let exp = eval_exp(exp, namespace);
     match scrutinee {
         Scrutinee::Literal { value: n } => match_literal(&exp, n),
         Scrutinee::VariableExpression { name } => {
-            Some(vec![(name.primary_name.to_string(), exp.clone())])
+            let match_req_map = vec![];
+            let match_impl_map = vec![(name.primary_name.to_string(), exp.clone())];
+            Some((match_req_map, match_impl_map))
         }
         Scrutinee::Tuple { elems } => match_tuple(&exp, elems, namespace),
         Scrutinee::StructScrutinee {
@@ -25,11 +27,19 @@ pub fn matcher<'sc>(
     }
 }
 
-fn match_literal<'sc>(exp: &Expression<'sc>, n: &Literal<'sc>) -> Option<MatchMap<'sc>> {
+fn match_literal<'sc>(
+    exp: &Expression<'sc>,
+    n: &Literal<'sc>,
+) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
     match exp {
         Expression::Literal { value: m } => {
             if n == m {
-                Some(vec![])
+                let match_req_map = vec![(
+                    Expression::Literal { value: n.clone() },
+                    Expression::Literal { value: m.clone() },
+                )];
+                let match_impl_map = vec![];
+                Some((match_req_map, match_impl_map))
             } else {
                 None
             }
@@ -42,21 +52,24 @@ fn match_tuple<'sc>(
     exp: &Expression<'sc>,
     scrutinee_elems: &Vec<Scrutinee<'sc>>,
     namespace: &Namespace<'sc>,
-) -> Option<MatchMap<'sc>> {
+) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
     match exp {
         Expression::Tuple { elems } => {
             if elems.len() != scrutinee_elems.len() {
                 return None;
             }
-            let it = elems.iter().zip(scrutinee_elems.iter());
-            let mut match_map = vec![];
-            for (elem, scrutinee_elem) in it {
+            let mut match_req_maps = vec![];
+            let mut match_impl_maps = vec![];
+            for (elem, scrutinee_elem) in elems.iter().zip(scrutinee_elems.iter()) {
                 match matcher(elem, scrutinee_elem, namespace) {
-                    Some(mut new_match_map) => match_map.append(&mut new_match_map),
+                    Some((mut match_req_map, mut match_impl_map)) => {
+                        match_req_maps.append(&mut match_req_map);
+                        match_impl_maps.append(&mut match_impl_map);
+                    }
                     None => return None,
                 }
             }
-            Some(match_map)
+            Some((match_req_maps, match_impl_maps))
         }
         _ => None,
     }
@@ -67,7 +80,7 @@ fn match_struct<'sc>(
     scrutinee_struct_name: &Ident<'sc>,
     scrutinee_fields: &Vec<StructScrutineeField<'sc>>,
     namespace: &Namespace<'sc>,
-) -> Option<MatchMap<'sc>> {
+) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
     match exp {
         Expression::StructExpression {
             struct_name,
@@ -76,9 +89,9 @@ fn match_struct<'sc>(
             if struct_name.primary_name != scrutinee_struct_name.primary_name {
                 return None;
             }
-            let it = fields.iter().zip(scrutinee_fields.iter());
-            let mut match_map = vec![];
-            for (field, scrutinee_field) in it {
+            let mut match_req_maps = vec![];
+            let mut match_impl_maps = vec![];
+            for (field, scrutinee_field) in fields.iter().zip(scrutinee_fields.iter()) {
                 let scrutinee = scrutinee_field.scrutinee.clone();
                 match scrutinee {
                     // if the scrutinee is simply naming the struct field ...
@@ -86,19 +99,22 @@ fn match_struct<'sc>(
                         if field.name.primary_name != name.primary_name {
                             return None;
                         }
-                        match_map.push((
+                        match_impl_maps.push((
                             name.primary_name.to_string(),
                             eval_exp(&field.value, namespace),
                         ));
                     }
                     // or if the scrutinee has a more complex agenda
                     scrutinee => match matcher(&field.value, &scrutinee.clone(), namespace) {
-                        Some(mut new_match_map) => match_map.append(&mut new_match_map),
+                        Some((mut match_req_map, mut match_impl_map)) => {
+                            match_req_maps.append(&mut match_req_map);
+                            match_impl_maps.append(&mut match_impl_map);
+                        }
                         None => return None,
                     },
                 }
             }
-            Some(match_map)
+            Some((match_req_maps, match_impl_maps))
         }
         _ => None,
     }
@@ -131,7 +147,9 @@ mod test {
         let exp = literal(u32_(4));
         let scrutinee = literal_scrutinee(u32_(4));
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert!(matches.unwrap().is_empty());
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert!(match_impl_map.is_empty());
+        assert_eq!(match_req_map.len(), 1);
     }
 
     #[test]
@@ -141,7 +159,9 @@ mod test {
         let exp = variable("x");
         let scrutinee = literal_scrutinee(u32_(4));
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert!(matches.unwrap().is_empty());
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert!(match_impl_map.is_empty());
+        assert_eq!(match_req_map.len(), 1);
     }
 
     #[test]
@@ -150,7 +170,9 @@ mod test {
         let exp = literal(u32_(4));
         let scrutinee = variable_scrutinee("x");
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -158,9 +180,11 @@ mod test {
         let mut namespace = HashMap::new();
         namespace.insert("x".to_string(), literal(u32_(4)));
         let exp = variable("x");
-        let scrutinee = variable_scrutinee("x");
+        let scrutinee = variable_scrutinee("y");
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -169,7 +193,9 @@ mod test {
         let exp = tuple(vec![literal(u32_(2)), literal(u32_(4))]);
         let scrutinee = variable_scrutinee("x");
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -179,7 +205,9 @@ mod test {
         let scrutinee =
             tuple_scrutinee(vec![literal_scrutinee(u32_(2)), literal_scrutinee(u32_(4))]);
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 0);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 0);
+        assert_eq!(match_req_map.len(), 2);
     }
 
     #[test]
@@ -188,7 +216,9 @@ mod test {
         let exp = tuple(vec![literal(u32_(2)), literal(u32_(4))]);
         let scrutinee = tuple_scrutinee(vec![variable_scrutinee("x"), variable_scrutinee("y")]);
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 2);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 2);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -197,7 +227,9 @@ mod test {
         let exp = tuple(vec![literal(u32_(2)), literal(u32_(4))]);
         let scrutinee = tuple_scrutinee(vec![variable_scrutinee("x"), literal_scrutinee(u32_(4))]);
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 1);
     }
 
     #[test]
@@ -225,7 +257,9 @@ mod test {
         let exp = variable("foo");
         let scrutinee = variable_scrutinee("bar");
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -250,7 +284,9 @@ mod test {
             ],
         );
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 2);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 2);
+        assert_eq!(match_req_map.len(), 0);
     }
 
     #[test]
@@ -275,7 +311,9 @@ mod test {
             ],
         );
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches.unwrap().len(), 1);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 1);
     }
 
     #[test]
