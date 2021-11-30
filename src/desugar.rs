@@ -152,19 +152,16 @@ mod test {
                     match_scrutinee(literal_scrutinee(u32_(5))),
                     literal(u32_(42)),
                 ),
-                match_branch(
-                    match_scrutinee(variable_scrutinee("foo")),
-                    variable("foo"),
-                ),
+                match_branch(match_scrutinee(variable_scrutinee("foo")), variable("foo")),
             ],
         );
         let oracle_node = if_statement(
             binop_eq(literal(u32_(5)), literal(u32_(5))),
-            block(vec!(expression(literal(u32_(42))))),
-            Some(block(vec!(
+            block(vec![expression(literal(u32_(42)))]),
+            Some(block(vec![
                 variable_declaraction("foo", literal(u32_(5)), false),
-                expression(variable("foo"))
-            )))
+                expression(variable("foo")),
+            ])),
         );
         let desugared = desugar(node, &namespace);
         let desugared_node = desugared.unwrap();

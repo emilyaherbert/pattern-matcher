@@ -183,7 +183,7 @@ pub mod constructors {
         }))
     }
 
-    pub fn expression<'sc>(exp: Expression<'sc>) -> Node <'sc> {
+    pub fn expression<'sc>(exp: Expression<'sc>) -> Node<'sc> {
         Node::Expression(exp)
     }
 
@@ -258,7 +258,7 @@ pub mod constructors {
         Expression::BinOp {
             op2: Op2::And,
             left: Box::new(left),
-            right: Box::new(right)
+            right: Box::new(right),
         }
     }
 
@@ -266,7 +266,7 @@ pub mod constructors {
         Expression::BinOp {
             op2: Op2::Eq,
             left: Box::new(left),
-            right: Box::new(right)
+            right: Box::new(right),
         }
     }
 
@@ -302,11 +302,15 @@ pub mod constructors {
         StructScrutineeField { scrutinee }
     }
 
-    pub fn if_statement<'sc>(primary: Expression<'sc>, left: Expression<'sc>, right: Option<Expression<'sc>>) -> Node<'sc> {
+    pub fn if_statement<'sc>(
+        primary: Expression<'sc>,
+        left: Expression<'sc>,
+        right: Option<Expression<'sc>>,
+    ) -> Node<'sc> {
         Node::IfExpression(IfExpression {
             primary,
             left,
-            right
+            right,
         })
     }
 }
