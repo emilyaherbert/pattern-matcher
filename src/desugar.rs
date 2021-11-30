@@ -143,7 +143,7 @@ mod test {
     use std::collections::HashMap;
 
     #[test]
-    fn match_u32() {
+    fn match_simple() {
         let namespace = HashMap::new();
         let node = match_(
             literal(u32_(5)),
@@ -161,6 +161,61 @@ mod test {
             Some(block(vec![
                 variable_declaraction("foo", literal(u32_(5)), false),
                 expression(variable("foo")),
+            ])),
+        );
+        let desugared = desugar(node, &namespace);
+        let desugared_node = desugared.unwrap();
+        assert_eq!(desugared_node, oracle_node);
+    }
+
+    #[test]
+    fn match_struct() {
+        let mut namespace = HashMap::new();
+        namespace.insert(
+            "foo".to_string(),
+            struct_(
+                "Point",
+                vec![
+                    struct_field("x", literal(u32_(5))),
+                    struct_field("y", literal(u32_(7))),
+                ],
+            ),
+        );
+        let node = match_(
+            variable("foo"),
+            vec![
+                match_branch(
+                    match_scrutinee(struct_scrutinee(
+                        "Point",
+                        vec![
+                            struct_scrutinee_field(variable_scrutinee("x")),
+                            struct_scrutinee_field(literal_scrutinee(u32_(7))),
+                        ],
+                    )),
+                    variable("x"),
+                ),
+                match_branch(
+                    match_scrutinee(struct_scrutinee(
+                        "Point",
+                        vec![
+                            struct_scrutinee_field(variable_scrutinee("x")),
+                            struct_scrutinee_field(variable_scrutinee("y")),
+                        ],
+                    )),
+                    variable("y"),
+                ),
+            ],
+        );
+        let oracle_node = if_statement(
+            binop_eq(literal(u32_(7)), literal(u32_(7))),
+            block(vec![
+                variable_declaraction("x", literal(u32_(5)), false),
+                expression(variable("x")),
+            ]),
+            Some(block(vec![
+                variable_declaraction("x", literal(u32_(5)), false),
+                variable_declaraction("y", literal(u32_(7)), false),
+                expression(variable("y")),
             ])),
         );
         let desugared = desugar(node, &namespace);
