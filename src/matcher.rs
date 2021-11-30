@@ -3,7 +3,7 @@ use crate::language::*;
 // if (x == y)
 pub type MatchReqMap<'sc> = Vec<(Expression<'sc>, Expression<'sc>)>;
 // let z = 4;
-pub type MatchImplMap<'sc> = Vec<(String, Expression<'sc>)>;
+pub type MatchImplMap<'sc> = Vec<(&'sc str, Expression<'sc>)>;
 
 pub fn matcher<'sc>(
     exp: &Expression<'sc>,
@@ -15,7 +15,7 @@ pub fn matcher<'sc>(
         Scrutinee::Literal { value: n } => match_literal(&exp, n),
         Scrutinee::VariableExpression { name } => {
             let match_req_map = vec![];
-            let match_impl_map = vec![(name.primary_name.to_string(), exp.clone())];
+            let match_impl_map = vec![(name.primary_name, exp.clone())];
             Some((match_req_map, match_impl_map))
         }
         Scrutinee::Tuple { elems } => match_tuple(&exp, elems, namespace),
@@ -31,6 +31,8 @@ fn match_literal<'sc>(
     exp: &Expression<'sc>,
     n: &Literal<'sc>,
 ) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
+    println!("{:?}", exp);
+    println!("{:?}", n);
     match exp {
         Expression::Literal { value: m } => {
             if n == m {
@@ -99,10 +101,8 @@ fn match_struct<'sc>(
                         if field.name.primary_name != name.primary_name {
                             return None;
                         }
-                        match_impl_maps.push((
-                            name.primary_name.to_string(),
-                            eval_exp(&field.value, namespace),
-                        ));
+                        match_impl_maps
+                            .push((name.primary_name, eval_exp(&field.value, namespace)));
                     }
                     // or if the scrutinee has a more complex agenda
                     scrutinee => match matcher(&field.value, &scrutinee.clone(), namespace) {

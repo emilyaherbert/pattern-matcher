@@ -31,6 +31,11 @@ pub enum Expression<'sc> {
     VariableExpression {
         name: Ident<'sc>,
     },
+    BinOp {
+        op2: Op2,
+        left: Box<Expression<'sc>>,
+        right: Box<Expression<'sc>>,
+    },
     Unit {},
     Array {
         contents: Vec<Expression<'sc>>,
@@ -50,6 +55,12 @@ pub enum Expression<'sc> {
         struct_name: Ident<'sc>,
         fields: Vec<StructExpressionField<'sc>>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Op2 {
+    And,
+    Eq,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,7 +127,7 @@ pub struct MatchStatement<'sc> {
 pub struct IfExpression<'sc> {
     pub primary: Expression<'sc>,
     pub left: Expression<'sc>,
-    pub right: Expression<'sc>,
+    pub right: Option<Expression<'sc>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -170,6 +181,10 @@ pub mod constructors {
             body,
             is_mutable,
         }))
+    }
+
+    pub fn expression<'sc>(exp: Expression<'sc>) -> Node <'sc> {
+        Node::Expression(exp)
     }
 
     pub fn return_<'sc>(expr: Expression<'sc>) -> Node<'sc> {
@@ -239,6 +254,22 @@ pub mod constructors {
         }
     }
 
+    pub fn binop_and<'sc>(left: Expression<'sc>, right: Expression<'sc>) -> Expression<'sc> {
+        Expression::BinOp {
+            op2: Op2::And,
+            left: Box::new(left),
+            right: Box::new(right)
+        }
+    }
+
+    pub fn binop_eq<'sc>(left: Expression<'sc>, right: Expression<'sc>) -> Expression<'sc> {
+        Expression::BinOp {
+            op2: Op2::Eq,
+            left: Box::new(left),
+            right: Box::new(right)
+        }
+    }
+
     pub fn u32_<'sc>(n: u32) -> Literal<'sc> {
         Literal::U32(n)
     }
@@ -269,5 +300,13 @@ pub mod constructors {
 
     pub fn struct_scrutinee_field<'sc>(scrutinee: Scrutinee<'sc>) -> StructScrutineeField<'sc> {
         StructScrutineeField { scrutinee }
+    }
+
+    pub fn if_statement<'sc>(primary: Expression<'sc>, left: Expression<'sc>, right: Option<Expression<'sc>>) -> Node<'sc> {
+        Node::IfExpression(IfExpression {
+            primary,
+            left,
+            right
+        })
     }
 }
