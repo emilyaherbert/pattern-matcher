@@ -1,10 +1,24 @@
 use std::collections::HashMap;
+use std::fmt::{self, write};
 
 pub type Namespace<'sc> = HashMap<String, Expression<'sc>>;
 
 #[derive(Debug)]
 pub struct Tree<'sc> {
     pub nodes: Vec<Node<'sc>>,
+}
+
+impl<'sc> fmt::Display for Tree<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut line_separated = String::new();
+
+        for node in self.nodes.iter() {
+            line_separated.push_str(&node.to_string());
+            line_separated.push_str(";\n");
+        }
+
+        write!(f, "{}", line_separated)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,10 +31,30 @@ pub enum Node<'sc> {
     IfExpression(IfExpression<'sc>),
 }
 
+impl<'sc> fmt::Display for Node<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Node::Declaration(declaration) => write!(f, "{}", declaration.to_string()),
+            node => write!(f, "{}", format!("{:?}", node)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Declaration<'sc> {
     VariableDeclaration(VariableDeclaration<'sc>),
     Reassignment(Reassignment<'sc>),
+}
+
+impl<'sc> fmt::Display for Declaration<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Declaration::VariableDeclaration(variable_decl) => {
+                write!(f, "{}", variable_decl.to_string())
+            }
+            Declaration::Reassignment(reassign_decl) => write!(f, "{}", reassign_decl.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +91,15 @@ pub enum Expression<'sc> {
     },
 }
 
+impl<'sc> fmt::Display for Expression<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Expression::Literal { value } => write!(f, "{}", value.to_string()),
+            exp => write!(f, "{}", format!("{:?}", exp)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op2 {
     And,
@@ -86,6 +129,20 @@ pub struct VariableDeclaration<'sc> {
     pub is_mutable: bool,
 }
 
+impl<'sc> fmt::Display for VariableDeclaration<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = String::new();
+        output.push_str("let ");
+        if self.is_mutable {
+            output.push_str("mut ");
+        }
+        output.push_str(self.name.primary_name);
+        output.push_str(" = ");
+        output.push_str(&self.body.to_string());
+        write!(f, "{}", output)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ident<'sc> {
     pub primary_name: &'sc str,
@@ -99,6 +156,16 @@ pub struct Reassignment<'sc> {
     pub rhs: Expression<'sc>,
 }
 
+impl<'sc> fmt::Display for Reassignment<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut output = String::new();
+        output.push_str(&self.lhs.to_string());
+        output.push_str(" = ");
+        output.push_str(&self.rhs.to_string());
+        write!(f, "{}", output)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Literal<'sc> {
     U8(u8),
@@ -108,7 +175,20 @@ pub enum Literal<'sc> {
     String(&'sc str),
     Boolean(bool),
     Byte(u8),
-    B256([u8; 32]),
+}
+
+impl<'sc> fmt::Display for Literal<'sc> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Literal::U8(lit) => write!(f, "{}", lit.to_string()),
+            Literal::U16(lit) => write!(f, "{}", lit.to_string()),
+            Literal::U32(lit) => write!(f, "{}", lit.to_string()),
+            Literal::U64(lit) => write!(f, "{}", lit.to_string()),
+            Literal::String(lit) => write!(f, "{}", lit.to_string()),
+            Literal::Boolean(lit) => write!(f, "{}", lit.to_string()),
+            Literal::Byte(lit) => write!(f, "{}", lit.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

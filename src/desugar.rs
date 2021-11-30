@@ -123,7 +123,7 @@ fn desugar_match_statement<'sc>(
                     }),
                 }));
             }
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 
