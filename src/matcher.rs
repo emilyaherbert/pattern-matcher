@@ -33,16 +33,12 @@ fn match_literal<'sc>(
 ) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
     match exp {
         Expression::Literal { value: m } => {
-            if n == m {
-                let match_req_map = vec![(
-                    Expression::Literal { value: n.clone() },
-                    Expression::Literal { value: m.clone() },
-                )];
-                let match_impl_map = vec![];
-                Some((match_req_map, match_impl_map))
-            } else {
-                None
-            }
+            let match_req_map = vec![(
+                Expression::Literal { value: n.clone() },
+                Expression::Literal { value: m.clone() },
+            )];
+            let match_impl_map = vec![];
+            Some((match_req_map, match_impl_map))
         }
         _ => None,
     }
@@ -336,6 +332,8 @@ mod test {
             ],
         );
         let matches = matcher(&exp, &scrutinee, &namespace);
-        assert_eq!(matches, None);
+        let (match_req_map, match_impl_map) = matches.unwrap();
+        assert_eq!(match_impl_map.len(), 1);
+        assert_eq!(match_req_map.len(), 1);
     }
 }
