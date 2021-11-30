@@ -293,6 +293,10 @@ pub mod constructors {
         MatchScrutinee::Scrutinee(scrutinee)
     }
 
+    pub fn match_scrutinee_catchall<'sc>() -> MatchScrutinee<'sc> {
+        MatchScrutinee::CatchAll
+    }
+
     pub fn variable<'sc>(name: &'sc str) -> Expression<'sc> {
         Expression::VariableExpression {
             name: Ident { primary_name: name },
@@ -392,5 +396,17 @@ pub mod constructors {
             left,
             right,
         })
+    }
+
+    pub fn if_expression<'sc>(
+        primary: Expression<'sc>,
+        left: Expression<'sc>,
+        right: Option<Expression<'sc>>,
+    ) -> Expression<'sc> {
+        Expression::IfExp {
+            condition: Box::new(primary),
+            then: Box::new(left),
+            r#else: right.map(Box::new),
+        }
     }
 }

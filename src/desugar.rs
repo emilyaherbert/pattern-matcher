@@ -1,3 +1,4 @@
+use crate::language::constructors::{boolean, literal, variable_scrutinee};
 use crate::language::*;
 use crate::matcher::*;
 
@@ -17,17 +18,15 @@ fn desugar_match_statement<'sc>(
 ) -> Result<Node<'sc>, String> {
     let mut matched_branches = vec![];
     for MatchBranch { condition, result } in branches.iter() {
-        match condition {
-            MatchScrutinee::CatchAll => unimplemented!(),
-            MatchScrutinee::Scrutinee(scrutinee) => {
-                let matches = matcher(&primary, scrutinee, namespace);
-                match matches {
-                    Some((match_req_map, match_impl_map)) => {
-                        matched_branches.push((result.to_owned(), match_req_map, match_impl_map))
-                    }
-                    None => return Err("Incompatible match provided".to_string()),
-                }
+        let matches = match condition {
+            MatchScrutinee::CatchAll => Some((vec![], vec![])),
+            MatchScrutinee::Scrutinee(scrutinee) => matcher(&primary, scrutinee, namespace),
+        };
+        match matches {
+            Some((match_req_map, match_impl_map)) => {
+                matched_branches.push((result.to_owned(), match_req_map, match_impl_map))
             }
+            None => return Err("Incompatible match provided".to_string()),
         }
     }
 
@@ -90,19 +89,28 @@ fn desugar_match_statement<'sc>(
                     contents: the_contents,
                 },
             })) => {
-                if_statement = Some(Node::IfExpression(IfExpression {
-                    primary: conditional.unwrap(),
-                    left: Expression::CodeBlock {
-                        contents: CodeBlock {
-                            contents: code_block_stmts,
-                        },
+                let left = Expression::CodeBlock {
+                    contents: CodeBlock {
+                        contents: code_block_stmts,
                     },
-                    right: Some(Expression::CodeBlock {
-                        contents: CodeBlock {
-                            contents: the_contents,
-                        },
-                    }),
-                }));
+                };
+                let right = Some(Expression::CodeBlock {
+                    contents: CodeBlock {
+                        contents: the_contents,
+                    },
+                });
+                if_statement = match conditional {
+                    None => Some(Node::IfExpression(IfExpression {
+                        primary: literal(boolean(true)),
+                        left,
+                        right,
+                    })),
+                    Some(conditional) => Some(Node::IfExpression(IfExpression {
+                        primary: conditional,
+                        left,
+                        right,
+                    })),
+                };
             }
             Some(Node::IfExpression(IfExpression {
                 primary,
@@ -214,6 +222,67 @@ mod test {
                 variable_declaraction("y", literal(u32_(7)), false),
                 expression(variable("y")),
             ])),
+        );
+        let desugared = desugar(node, &namespace);
+        let desugared_node = desugared.unwrap();
+        assert_eq!(desugared_node, oracle_node);
+    }
+
+    #[test]
+    fn match_struct_with_scrutinee() {
+        let mut namespace = HashMap::new();
+        namespace.insert(
+            "foo".to_string(),
+            struct_(
+                "Point",
+                vec![
+                    struct_field("x", literal(u32_(5))),
+                    struct_field("y", literal(u32_(7))),
+                ],
+            ),
+        );
+        let node = match_(
+            variable("foo"),
+            vec![
+                match_branch(
+                    match_scrutinee(struct_scrutinee(
+                        "Point",
+                        vec![
+                            struct_scrutinee_field(variable_scrutinee("x")),
+                            struct_scrutinee_field(literal_scrutinee(u32_(7))),
+                        ],
+                    )),
+                    variable("x"),
+                ),
+                match_branch(
+                    match_scrutinee(struct_scrutinee(
+                        "Point",
+                        vec![
+                            struct_scrutinee_field(variable_scrutinee("x")),
+                            struct_scrutinee_field(variable_scrutinee("y")),
+                        ],
+                    )),
+                    variable("y"),
+                ),
+                match_branch(match_scrutinee_catchall(), literal(u32_(42))),
+            ],
+        );
+
+        let oracle_node = if_statement(
+            binop_eq(literal(u32_(7)), literal(u32_(7))),
+            block(vec![
+                variable_declaraction("x", literal(u32_(5)), false),
+                expression(variable("x")),
+            ]),
+            Some(if_expression(
+                literal(boolean(true)),
+                block(vec![
+                    variable_declaraction("x", literal(u32_(5)), false),
+                    variable_declaraction("y", literal(u32_(7)), false),
+                    expression(variable("y")),
+                ]),
+                Some(block(vec![expression(literal(u32_(42)))])),
+            )),
         );
         let desugared = desugar(node, &namespace);
         let desugared_node = desugared.unwrap();
