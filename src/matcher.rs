@@ -31,8 +31,6 @@ fn match_literal<'sc>(
     exp: &Expression<'sc>,
     n: &Literal<'sc>,
 ) -> Option<(MatchReqMap<'sc>, MatchImplMap<'sc>)> {
-    println!("{:?}", exp);
-    println!("{:?}", n);
     match exp {
         Expression::Literal { value: m } => {
             if n == m {

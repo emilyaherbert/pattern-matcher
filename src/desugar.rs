@@ -123,10 +123,7 @@ fn desugar_match_statement<'sc>(
                     }),
                 }));
             }
-            woah => {
-                println!("{:?}", woah);
-                unimplemented!()
-            }
+            _ => unimplemented!()
         }
     }
 
